@@ -128,6 +128,101 @@ describe.skipIf(!base)("UI browser flows (UI_TEST_URL)", () => {
       await p.close();
     }
   });
+  it("catalog keeps a compact desktop header and readable layouts in both themes", async () => {
+    const p = await page();
+    const games = Array.from({ length: 5 }, (_, index) => ({
+      ...game,
+      id: `layout-${index}`,
+      title: index ? `Gioco cooperativo con un titolo molto lungo ${index}` : game.title,
+      images: ["https://images.example.test/layout.png"],
+    }));
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+    }));
+    try {
+      await p.setViewportSize({ width: 1280, height: 800 });
+      await p.goto(base!);
+      await p.getByRole("heading", { name: game.title }).waitFor();
+      for (const width of [1280, 1024, 390, 320]) {
+        await p.setViewportSize({ width, height: 800 });
+        if (width >= 1024) {
+          expect((await p.locator(".site-header").boundingBox())!.height).toBeLessThanOrEqual(80);
+          const positions = await p.getByRole("navigation").getByRole("link").evaluateAll(
+            (links) => links.map((link) => link.getBoundingClientRect().top),
+          );
+          expect(new Set(positions).size).toBe(1);
+          const headlineLines = await p.getByRole("heading", { level: 1 }).evaluate(
+            (el) => el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight),
+          );
+          expect(headlineLines).toBeLessThanOrEqual(2.01);
+        }
+        for (const colorScheme of ["light", "dark"] as const) {
+          await p.emulateMedia({ colorScheme });
+          await accessible(p);
+        }
+      }
+      expect(await p.locator(".game-card > img").first().getAttribute("loading")).toBe("eager");
+    } finally { await p.context().close(); }
+  }, 60000);
+  it("game detail keeps booking before long descriptions and prioritizes the cover", async () => {
+    const p = await page();
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games: [{
+      ...game,
+      images: ["https://images.example.test/cover.png"],
+      description: Array(20).fill(game.description).join("\n\n"),
+    }] } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+    }));
+    try {
+      await p.setViewportSize({ width: 1280, height: 800 });
+      await p.goto(`${base}/games/${game.id}`);
+      await p.getByRole("heading", { name: game.title, level: 1 }).waitFor();
+      const action = p.locator(".game-detail").getByRole("link", { name: "Prenota un tavolo", exact: true });
+      const actionBox = (await action.boundingBox())!;
+      const descriptionBox = (await p.locator(".description").boundingBox())!;
+      expect(actionBox.y + actionBox.height).toBeLessThan(descriptionBox.y);
+      expect(actionBox.y + actionBox.height).toBeLessThan(800);
+      const cover = p.getByRole("region", { name: "Immagini del gioco" }).getByRole("img");
+      expect(await cover.getAttribute("loading")).toBe("eager");
+      expect(await cover.getAttribute("fetchpriority")).toBe("high");
+      await p.getByRole("heading", { name: "Il gioco", level: 2 }).waitFor();
+      await accessible(p);
+      await p.setViewportSize({ width: 320, height: 800 });
+      await p.emulateMedia({ colorScheme: "dark" });
+      await accessible(p);
+    } finally { await p.context().close(); }
+  });
+  it("carousel controls remain reachable on a short desktop viewport", async () => {
+    const p = await page();
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games: [{
+      ...game,
+      images: ["https://images.example.test/one.png", "https://images.example.test/two.png"],
+      description: Array(20).fill(game.description).join("\n\n"),
+    }] } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+    }));
+    try {
+      await p.setViewportSize({ width: 1280, height: 500 });
+      await p.goto(`${base}/games/${game.id}`);
+      const gallery = p.getByRole("region", { name: "Immagini del gioco" });
+      await gallery.getByRole("button", { name: "Immagine successiva" }).waitFor();
+      await p.evaluate(() => window.scrollTo(0, 400));
+      await p.waitForFunction(() => window.scrollY >= 400);
+      for (const button of await gallery.getByRole("button").all()) {
+        const box = (await button.boundingBox())!;
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(500);
+      }
+      await gallery.getByRole("button", { name: "Immagine successiva" }).click();
+      expect(await gallery.getByRole("status").textContent()).toBe("Immagine 2 di 2");
+    } finally { await p.context().close(); }
+  });
   it("catalog game-card photos stay white in light and dark mode", async () => {
     const p = await page();
     await p.route("**/api/games", (route) => route.fulfill({ json: { games: [

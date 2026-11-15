@@ -147,10 +147,12 @@ export function GameImage({
   src,
   title,
   className = "",
+  priority = false,
 }: {
   src?: string;
   title: string;
   className?: string;
+  priority?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed)
@@ -171,7 +173,8 @@ export function GameImage({
       className={className}
       src={src}
       alt={title}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       onError={() => setFailed(true)}
     />
   );

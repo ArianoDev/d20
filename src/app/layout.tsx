@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GeistSans } from "geist/font/sans";
 import { Navigation } from "@/components/common";
 import "./globals.css";
 
@@ -13,7 +14,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="it">
+    <html lang="it" className={GeistSans.variable}>
       <body>
         <a className="skip-link" href="#main">
           Vai al contenuto

@@ -26,13 +26,10 @@ export function Catalog() {
     complexity,
   );
   return (
-    <>
+    <div className="catalog-page">
       <section className="catalog-intro">
         <div>
-          <span className="eyebrow">La nostra collezione</span>
-          <h1>
-            La prossima partita comincia qui.
-          </h1>
+          <h1>La prossima partita comincia qui.</h1>
           <p>
             Cerca un gioco, scopri come si gioca e ritrova il tuo gruppo attorno
             a un tavolo.
@@ -114,23 +111,23 @@ export function Catalog() {
             </div>
             {games.length ? (
               <div className="game-grid">
-                {games.map((g) => (
+                {games.map((g, index) => (
                   <Link
                     href={`/games/${encodeURIComponent(g.id)}`}
                     className="game-card"
                     key={g.id}
                   >
-                    <GameImage src={g.images[0]} title={g.title} />
+                    <GameImage src={g.images[0]} title={g.title} priority={index === 0} />
                     <div className="game-card-body">
                       <div className="game-card-title">
                         <h3>{g.title}</h3>
                         <span aria-hidden="true">↗</span>
                       </div>
-                      <p>
-                        {g.minPlayers}–{g.maxPlayers} giocatori{" "}
-                        <span aria-hidden="true">·</span> {g.duration} min
-                      </p>
-                      <span className="tag">Complessità {g.complexity}/5</span>
+                      <div className="game-card-meta">
+                        <span>{g.minPlayers}-{g.maxPlayers} giocatori</span>
+                        <span>{g.duration} min</span>
+                      </div>
+                      <span className="game-card-complexity">Complessità {g.complexity}/5</span>
                     </div>
                   </Link>
                 ))}
@@ -166,7 +163,7 @@ export function Catalog() {
           </>
         )}
       </section>
-    </>
+    </div>
   );
 }
 function GameGallery({ game }: { game: Game }) {
@@ -189,6 +186,7 @@ function GameGallery({ game }: { game: Game }) {
     >
       <GameImage
         key={index}
+        priority
         src={game.images[index]}
         title={game.images.length ? `${game.title}, immagine ${index + 1}` : game.title}
       />
@@ -230,14 +228,13 @@ export function GameDetail({ id }: { id: string }) {
       </Link>
       <div className="game-detail">
         <GameGallery key={game.id} game={game} />
-        <article>
-          <span className="eyebrow">Dallo scaffale al tavolo</span>
+        <article className="game-summary">
           <h1>{game.title}</h1>
           <dl className="game-stats">
             <div>
               <dt>Giocatori</dt>
               <dd>
-                {game.minPlayers}–{game.maxPlayers}
+                {game.minPlayers}-{game.maxPlayers}
               </dd>
             </div>
             <div>
@@ -249,7 +246,6 @@ export function GameDetail({ id }: { id: string }) {
               <dd>{game.complexity}/5</dd>
             </div>
           </dl>
-          <p className="description">{game.description}</p>
           <div className="actions">
             <Link className="button" href="/calendar">
               Prenota un tavolo
@@ -266,6 +262,10 @@ export function GameDetail({ id }: { id: string }) {
           <p className="hint">
             La prenotazione riserva il tavolo, non una copia del gioco.
           </p>
+          <section className="game-description" aria-labelledby="description-title">
+            <h2 id="description-title">Il gioco</h2>
+            <p className="description">{game.description}</p>
+          </section>
         </article>
       </div>
     </>
