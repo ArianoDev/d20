@@ -24,8 +24,8 @@ export default function RootLayout({
         </main>
         <footer className="site-footer">
           <div>
-            <strong>d20 Ludoteca</strong>
-            <span>Giochi da condividere, un tavolo alla volta.</span>
+            <strong>D20 Playroom</strong>
+            <span>Esperienze da condividere, un gioco alla volta.</span>
           </div>
           <div>
             <span>Orari in fuso Europe/Rome</span>

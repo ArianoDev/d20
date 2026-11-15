@@ -104,7 +104,8 @@ describe.skipIf(!base)("UI browser flows (UI_TEST_URL)", () => {
     const p = await page();
     try {
       await p.goto(base!);
-      expect(await p.getByRole("link", { name: /Il posto per giocare insieme/ }).count()).toBe(1);
+      const brandText = (await p.locator("a.brand").innerText()).replace(/\s+/g, " ").trim();
+      expect(await p.getByRole("link", { name: brandText, exact: true }).count()).toBe(1);
       await p.getByRole("heading", { name: game.title }).waitFor();
       await p.getByLabel("Cerca nel catalogo").fill("inesistente");
       await p
@@ -126,6 +127,83 @@ describe.skipIf(!base)("UI browser flows (UI_TEST_URL)", () => {
     } finally {
       await p.close();
     }
+  });
+  it("catalog game-card photos stay white in light and dark mode", async () => {
+    const p = await page();
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games: [
+      { ...game, images: ["https://images.example.test/cover.png"] },
+      { ...game, id: "without-cover", title: "Gioco senza copertina" },
+    ] } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+    }));
+    try {
+      await p.goto(base!);
+      await p.getByRole("heading", { name: game.title }).waitFor();
+      expect(await p.locator(".game-card > img").count()).toBe(1);
+      const covers = p.locator(".game-card > img, .game-card > .image-fallback");
+      for (const colorScheme of ["light", "dark"] as const) {
+        await p.emulateMedia({ colorScheme });
+        expect(await covers.evaluateAll((elements) => elements.map((el) => getComputedStyle(el).backgroundColor)))
+          .toEqual(["rgb(255, 255, 255)", "rgb(255, 255, 255)"]);
+        await accessible(p);
+      }
+    } finally { await p.context().close(); }
+  });
+  it("game gallery shows one image with white background and accessible carousel navigation", async () => {
+    const p = await page();
+    const images = [1, 2, 3].map((n) => `https://images.example.test/game-${n}.png`);
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games: [{ ...game, images }] } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64"),
+    }));
+    try {
+      await p.goto(`${base}/games/${game.id}`);
+      await p.getByRole("heading", { name: game.title, level: 1 }).waitFor();
+      const gallery = p.getByRole("region", { name: "Immagini del gioco" });
+      expect(await gallery.count()).toBe(1);
+      const image = gallery.getByRole("img");
+      await image.waitFor();
+      expect(await image.count()).toBe(1);
+      expect(await image.getAttribute("src")).toBe(images[0]);
+      expect(await gallery.getByRole("status").textContent()).toBe("Immagine 1 di 3");
+      expect(await gallery.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+      await gallery.getByRole("button", { name: "Immagine successiva" }).click();
+      expect(await image.getAttribute("src")).toBe(images[1]);
+      expect(await gallery.getByRole("status").textContent()).toBe("Immagine 2 di 3");
+      await p.keyboard.press("ArrowLeft");
+      expect(await image.getAttribute("src")).toBe(images[0]);
+      await gallery.getByRole("button", { name: "Immagine precedente" }).click();
+      expect(await image.getAttribute("src")).toBe(images[2]);
+      expect(await image.count()).toBe(1);
+      await accessible(p);
+      await p.setViewportSize({ width: 390, height: 844 });
+      await p.emulateMedia({ colorScheme: "dark" });
+      expect(await gallery.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+      expect(await image.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+      await accessible(p);
+    } finally { await p.context().close(); }
+  });
+  it("game gallery hides carousel controls for a single image and handles missing or broken images", async () => {
+    const p = await page();
+    let images = ["https://images.example.test/broken.png"];
+    await p.route("**/api/games", (route) => route.fulfill({ json: { games: [{ ...game, images }] } }));
+    await p.route("https://images.example.test/**", (route) => route.fulfill({ status: 404 }));
+    try {
+      await p.goto(`${base}/games/${game.id}`);
+      const gallery = p.getByRole("region", { name: "Immagini del gioco" });
+      await gallery.getByRole("img", { name: /Immagine non disponibile/ }).waitFor();
+      expect(await gallery.getByRole("button").count()).toBe(0);
+      expect(await gallery.getByRole("status").count()).toBe(0);
+      await p.emulateMedia({ colorScheme: "dark" });
+      await accessible(p);
+      images = [];
+      await p.reload();
+      await gallery.getByRole("img", { name: /Immagine non disponibile/ }).waitFor();
+      expect(await gallery.getByRole("button").count()).toBe(0);
+    } finally { await p.context().close(); }
   });
   it("books with email and names and displays pending success", async () => {
     const p = await page();

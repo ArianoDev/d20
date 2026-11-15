@@ -31,9 +31,7 @@ export function Catalog() {
         <div>
           <span className="eyebrow">La nostra collezione</span>
           <h1>
-            La prossima partita
-            <br />
-            comincia qui.
+            La prossima partita comincia qui.
           </h1>
           <p>
             Cerca un gioco, scopri come si gioca e ritrova il tuo gruppo attorno
@@ -171,6 +169,45 @@ export function Catalog() {
     </>
   );
 }
+function GameGallery({ game }: { game: Game }) {
+  const [index, setIndex] = useState(0);
+  const multiple = game.images.length > 1;
+  function move(step: number) {
+    setIndex((current) => (current + step + game.images.length) % game.images.length);
+  }
+  return (
+    <section
+      className="gallery"
+      aria-label="Immagini del gioco"
+      aria-roledescription={multiple ? "carosello" : undefined}
+      onKeyDown={(event) => {
+        if (multiple && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+          event.preventDefault();
+          move(event.key === "ArrowRight" ? 1 : -1);
+        }
+      }}
+    >
+      <GameImage
+        key={index}
+        src={game.images[index]}
+        title={game.images.length ? `${game.title}, immagine ${index + 1}` : game.title}
+      />
+      {multiple && (
+        <div className="gallery-controls">
+          <button type="button" aria-label="Immagine precedente" onClick={() => move(-1)}>
+            Precedente
+          </button>
+          <output aria-live="polite" aria-atomic="true">
+            <span className="sr-only">Immagine </span>{index + 1} di {game.images.length}
+          </output>
+          <button type="button" aria-label="Immagine successiva" onClick={() => move(1)}>
+            Successiva
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
 export function GameDetail({ id }: { id: string }) {
   const resource = useResource<{ games: Game[] }>("/api/games");
   const game = resource.data?.games.find((g) => g.id === id && !g.archived);
@@ -192,19 +229,7 @@ export function GameDetail({ id }: { id: string }) {
         ← Tutti i giochi
       </Link>
       <div className="game-detail">
-        <div className="gallery">
-          {game.images.length ? (
-            game.images.map((src, i) => (
-              <GameImage
-                key={src}
-                src={src}
-                title={`${game.title}, immagine ${i + 1}`}
-              />
-            ))
-          ) : (
-            <GameImage title={game.title} />
-          )}
-        </div>
+        <GameGallery key={game.id} game={game} />
         <article>
           <span className="eyebrow">Dallo scaffale al tavolo</span>
           <h1>{game.title}</h1>

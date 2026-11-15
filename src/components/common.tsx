@@ -12,8 +12,8 @@ export function Navigation() {
         <Link href="/" className="brand">
           <span className="brand-mark">d20</span>
           <span>
-            Ludoteca
-            <span className="brand-sub">Il posto per giocare insieme</span>
+            GRS Playroom
+            <span className="brand-sub">Giochi da Tavolo e Giochi di Ruolo</span>
           </span>
         </Link>
         <nav aria-label="Navigazione principale">
